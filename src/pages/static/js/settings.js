@@ -830,8 +830,9 @@ function escapeHtmlAttribute(text) {
 function isSafeUrl(url) {
   if (!url) return false;
   try {
-    const parsed = new URL(url);
-    // Only allow http and https protocols
+    // Use a base URL to prevent relative URL bypasses like '//evil.com'
+    const parsed = new URL(url, 'https://example.com/');
+    // Only allow http, https, and p2p protocols (ipfs, ipns, hyper)
     const allowedSchemes = ['http:', 'https:', 'ipfs:', 'ipns:', 'hyper:'];
     return allowedSchemes.includes(parsed.protocol);
   } catch (e) {
@@ -855,11 +856,11 @@ async function loadArchiveData() {
         data.hyper.reverse().forEach(item => {
           const time = new Date(item.timestamp).toLocaleString();
           const name = escapeHtml(item.name || 'Unknown');
-          const key = escapeHtml(item.key || '');
-          const keyShort = key.substring(0, 16);
+          const keyRaw = item.key || '';
+          const keyShort = escapeHtml(keyRaw.substring(0, 16));
           const type = escapeHtml(item.type || 'drive');
           const timeEscaped = escapeHtml(time);
-          const keyAttr = escapeHtmlAttribute(item.key || '');
+          const keyAttr = escapeHtmlAttribute(keyRaw);
           
           html += `<tr>
             <td>${name}</td>
@@ -886,10 +887,10 @@ async function loadArchiveData() {
         data.ipfs.reverse().forEach(item => {
           const time = new Date(item.timestamp).toLocaleString();
           const name = escapeHtml(item.name || 'Unknown');
-          const cid = escapeHtml(item.cid || '');
-          const cidShort = cid.substring(0, 16);
+          const cidRaw = item.cid || '';
+          const cidShort = escapeHtml(cidRaw.substring(0, 16));
           const timeEscaped = escapeHtml(time);
-          const cidAttr = escapeHtmlAttribute(item.cid || '');
+          const cidAttr = escapeHtmlAttribute(cidRaw);
           
           // Only render link if URL is safe
           let actionButtons = `<button class="btn btn-secondary btn-sm copy-btn" data-copy="${cidAttr}">Copy CID</button>`;
@@ -920,9 +921,9 @@ async function loadArchiveData() {
         let html = '<table class="archive-table"><thead><tr><th>Name</th><th>Content Hash</th><th>Action</th></tr></thead><tbody>';
         data.ens.forEach(([name, hash]) => {
           const nameEscaped = escapeHtml(name || '');
-          const hashEscaped = escapeHtml(hash || '');
-          const hashShort = hashEscaped.substring(0, 20);
-          const hashAttr = escapeHtmlAttribute(hash || '');
+          const hashRaw = hash || '';
+          const hashShort = escapeHtml(hashRaw.substring(0, 20));
+          const hashAttr = escapeHtmlAttribute(hashRaw);
           
           html += `<tr>
             <td>${nameEscaped}</td>
