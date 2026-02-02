@@ -829,10 +829,15 @@ function escapeHtmlAttribute(text) {
  */
 function isSafeUrl(url) {
   if (!url) return false;
-  const urlStr = String(url).trim().toLowerCase();
-  // Block potentially dangerous URL schemes
-  const dangerousSchemes = ['javascript:', 'data:', 'vbscript:', 'file:'];
-  return !dangerousSchemes.some(scheme => urlStr.startsWith(scheme));
+  try {
+    const parsed = new URL(url);
+    // Block potentially dangerous URL schemes
+    const dangerousSchemes = ['javascript', 'data', 'vbscript', 'file'];
+    return !dangerousSchemes.includes(parsed.protocol.replace(':', '').toLowerCase());
+  } catch (e) {
+    // Invalid URL
+    return false;
+  }
 }
 
 async function loadArchiveData() {
@@ -890,7 +895,7 @@ async function loadArchiveData() {
           let actionButtons = `<button class="btn btn-secondary btn-sm copy-btn" data-copy="${cidAttr}">Copy CID</button>`;
           if (item.url && isSafeUrl(item.url)) {
             const urlAttr = escapeHtmlAttribute(item.url);
-            actionButtons += ` <a href="${urlAttr}" target="_blank" class="btn btn-primary btn-sm">Open</a>`;
+            actionButtons += ` <a href="${urlAttr}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open</a>`;
           }
           
           html += `<tr>
