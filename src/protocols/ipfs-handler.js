@@ -12,7 +12,7 @@ import { base32 } from "multiformats/bases/base32";
 import { base36 } from "multiformats/bases/base36";
 import { base58btc } from "multiformats/bases/base58";
 import { peerIdFromString, peerIdFromCID } from "@libp2p/peer-id";
-import { ensCache, saveEnsCache, RPC_URL, ipfsOptions } from "./config.js";
+import { ensCache, saveEnsCache, ipfsCache, saveIpfsCache, RPC_URL, ipfsOptions } from "./config.js";
 import { JsonRpcProvider } from "ethers";
 
 // Create a combined multibase decoder to handle base32, base36, and base58btc
@@ -162,6 +162,26 @@ export async function createHandler(ipfsOptions, session) {
       });
   
       console.log("Files uploaded with root CID:", rootCid.toString());
+
+      // Log to IPFS cache
+      try {
+        const timestamp = Date.now();
+        const cidStr = rootCid.toString();
+        // Check if already exists to avoid duplicates (optional but good)
+        if (!ipfsCache.some(entry => entry.cid === cidStr)) {
+          ipfsCache.push({
+            cid: cidStr,
+            timestamp: timestamp,
+            url: fileUrl,
+            name: currentFileName || "Upload " + new Date(timestamp).toLocaleString()
+          });
+          saveIpfsCache();
+          console.log(`Logged upload to IPFS cache: ${cidStr}`);
+        }
+      } catch (logErr) {
+        console.error("Error logging to IPFS cache:", logErr);
+      }
+
     } catch (e) {
       console.error("Error uploading file:", e);
       sendResponse({

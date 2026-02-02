@@ -313,7 +313,8 @@ function createSettingsAPI(pageContext) {
           throw new Error('File data must include name and content');
         }
         return ipcRenderer.invoke('settings-upload-wallpaper', fileData);
-      }
+      },
+      getArchiveData: () => ipcRenderer.invoke('settings-get-archive-data')
     };
   } else if (pageContext.isHome) {
     // Limited API for home pages - only clock and wallpaper

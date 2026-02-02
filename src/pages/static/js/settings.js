@@ -212,7 +212,8 @@ function createFallbackAPI(ipc) {
       reset: () => ipc.invoke('settings-reset'),
       clearBrowserCache: () => ipc.invoke('settings-clear-cache'),
       resetP2P: (opts = {}) => ipc.invoke('settings-reset-p2p', opts),
-      uploadWallpaper: (filePath) => ipc.invoke('settings-upload-wallpaper', filePath)
+      uploadWallpaper: (filePath) => ipc.invoke('settings-upload-wallpaper', filePath),
+      getArchiveData: () => ipc.invoke('settings-get-archive-data')
     },
     onThemeChanged: (callback) => wrapCallback('theme-changed', callback),
     onSearchEngineChanged: (callback) => wrapCallback('search-engine-changed', callback),
@@ -798,6 +799,103 @@ function applyThemeImmediately(themeName) {
   }
 }
 
+async function loadArchiveData() {
+  if (!settingsAPI?.settings?.getArchiveData) return;
+
+  try {
+    const data = await settingsAPI.settings.getArchiveData();
+    // data = { ipfs: [], hyper: [], ens: [] }
+
+    // Render Hyper
+    const hyperList = document.getElementById('hyper-archive-list');
+    if (hyperList) {
+      if (data.hyper && data.hyper.length > 0) {
+        let html = '<table class="archive-table"><thead><tr><th>Name</th><th>Key</th><th>Type</th><th>Time</th><th>Action</th></tr></thead><tbody>';
+        data.hyper.reverse().forEach(item => {
+          const time = new Date(item.timestamp).toLocaleString();
+          html += `<tr>
+            <td>${item.name || 'Unknown'}</td>
+            <td><code>${item.key.substring(0, 16)}...</code></td>
+            <td>${item.type || 'drive'}</td>
+            <td>${time}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${item.key}">Copy Key</button>
+            </td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        hyperList.innerHTML = html;
+      } else {
+        hyperList.innerHTML = '<p>No Hyperdrives found.</p>';
+      }
+    }
+
+    // Render IPFS
+    const ipfsList = document.getElementById('ipfs-archive-list');
+    if (ipfsList) {
+      if (data.ipfs && data.ipfs.length > 0) {
+        let html = '<table class="archive-table"><thead><tr><th>Name</th><th>CID</th><th>Time</th><th>Action</th></tr></thead><tbody>';
+        data.ipfs.reverse().forEach(item => {
+          const time = new Date(item.timestamp).toLocaleString();
+          html += `<tr>
+            <td>${item.name || 'Unknown'}</td>
+            <td><code>${item.cid.substring(0, 16)}...</code></td>
+            <td>${time}</td>
+            <td>
+              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${item.cid}">Copy CID</button>
+              <a href="${item.url}" target="_blank" class="btn btn-primary btn-sm">Open</a>
+            </td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        ipfsList.innerHTML = html;
+      } else {
+        ipfsList.innerHTML = '<p>No IPFS uploads found.</p>';
+      }
+    }
+
+    // Render ENS
+    const ensList = document.getElementById('ens-archive-list');
+    if (ensList) {
+      // ens is array of [name, contentHash]
+      if (data.ens && data.ens.length > 0) {
+        let html = '<table class="archive-table"><thead><tr><th>Name</th><th>Content Hash</th><th>Action</th></tr></thead><tbody>';
+        data.ens.forEach(([name, hash]) => {
+          html += `<tr>
+            <td>${name}</td>
+            <td><code>${hash.substring(0, 20)}...</code></td>
+            <td>
+              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${hash}">Copy Hash</button>
+            </td>
+          </tr>`;
+        });
+        html += '</tbody></table>';
+        ensList.innerHTML = html;
+      } else {
+        ensList.innerHTML = '<p>No ENS records cached.</p>';
+      }
+    }
+
+    // Add copy functionality
+    document.querySelectorAll('.copy-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const text = btn.dataset.copy;
+        navigator.clipboard.writeText(text).then(() => {
+          const originalText = btn.textContent;
+          btn.textContent = 'Copied!';
+          setTimeout(() => btn.textContent = originalText, 2000);
+        });
+      });
+    });
+
+  } catch (err) {
+    console.error('Failed to load archive data:', err);
+    document.getElementById('hyper-archive-list').innerHTML = `<p class="error">Error: ${err.message}</p>`;
+    document.getElementById('ipfs-archive-list').innerHTML = `<p class="error">Error: ${err.message}</p>`;
+    document.getElementById('ens-archive-list').innerHTML = `<p class="error">Error: ${err.message}</p>`;
+  }
+}
+
 // Sidebar navigation functionality for page switching
 function initializeSidebarNavigation() {
   const navItems = document.querySelectorAll('.nav-item');
@@ -830,7 +928,7 @@ function initializeSidebarNavigation() {
   // Check for hash-based navigation (backward compatibility)
   else if (currentPath.includes('#')) {
     const hashSection = currentPath.replace('#', '');
-    if (hashSection && ['appearance', 'search','tabs', 'extensions'].includes(hashSection)) {
+    if (hashSection && ['appearance', 'search','tabs', 'extensions', 'archive'].includes(hashSection)) {
       targetSection = hashSection;
     }
   }
@@ -878,6 +976,11 @@ function updateSectionUI(sectionName) {
   const targetPage = document.getElementById(targetPageId);
   if (targetPage) {
     targetPage.classList.add('active');
+  }
+
+  // Load data for Archive section
+  if (sectionName === 'archive') {
+    loadArchiveData();
   }
 }
 
