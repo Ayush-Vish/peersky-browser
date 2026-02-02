@@ -814,8 +814,8 @@ function sanitizeUrl(url) {
   // Validate URL to prevent javascript: and data: URLs
   try {
     const parsed = new URL(url);
-    // Only allow http, https, ipfs, and hyper protocols
-    if (['http:', 'https:', 'ipfs:', 'hyper:'].includes(parsed.protocol)) {
+    // Only allow http, https, ipfs, ipns, and hyper protocols
+    if (['http:', 'https:', 'ipfs:', 'ipns:', 'hyper:'].includes(parsed.protocol)) {
       return escapeHtml(url);
     }
   } catch (e) {
