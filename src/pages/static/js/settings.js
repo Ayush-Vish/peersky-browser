@@ -799,6 +799,47 @@ function applyThemeImmediately(themeName) {
   }
 }
 
+/**
+ * Escapes HTML special characters to prevent XSS
+ */
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+/**
+ * Escapes HTML attribute values to prevent XSS
+ */
+function escapeHtmlAttribute(text) {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Validates that a URL is safe (not javascript:, data:, etc.)
+ * @param {string} url - The URL to validate
+ * @returns {boolean} - True if safe, false otherwise
+ */
+function isSafeUrl(url) {
+  if (!url) return false;
+  try {
+    const parsed = new URL(url);
+    // Block potentially dangerous URL schemes
+    const dangerousSchemes = ['javascript', 'data', 'vbscript', 'file'];
+    return !dangerousSchemes.includes(parsed.protocol.replace(':', '').toLowerCase());
+  } catch (e) {
+    // Invalid URL
+    return false;
+  }
+}
+
 async function loadArchiveData() {
   if (!settingsAPI?.settings?.getArchiveData) return;
 
@@ -813,13 +854,20 @@ async function loadArchiveData() {
         let html = '<table class="archive-table"><thead><tr><th>Name</th><th>Key</th><th>Type</th><th>Time</th><th>Action</th></tr></thead><tbody>';
         data.hyper.reverse().forEach(item => {
           const time = new Date(item.timestamp).toLocaleString();
+          const name = escapeHtml(item.name || 'Unknown');
+          const key = escapeHtml(item.key || '');
+          const keyShort = key.substring(0, 16);
+          const type = escapeHtml(item.type || 'drive');
+          const timeEscaped = escapeHtml(time);
+          const keyAttr = escapeHtmlAttribute(item.key || '');
+          
           html += `<tr>
-            <td>${item.name || 'Unknown'}</td>
-            <td><code>${item.key.substring(0, 16)}...</code></td>
-            <td>${item.type || 'drive'}</td>
-            <td>${time}</td>
+            <td>${name}</td>
+            <td><code>${keyShort}...</code></td>
+            <td>${type}</td>
+            <td>${timeEscaped}</td>
             <td>
-              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${item.key}">Copy Key</button>
+              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${keyAttr}">Copy Key</button>
             </td>
           </tr>`;
         });
@@ -837,14 +885,24 @@ async function loadArchiveData() {
         let html = '<table class="archive-table"><thead><tr><th>Name</th><th>CID</th><th>Time</th><th>Action</th></tr></thead><tbody>';
         data.ipfs.reverse().forEach(item => {
           const time = new Date(item.timestamp).toLocaleString();
+          const name = escapeHtml(item.name || 'Unknown');
+          const cid = escapeHtml(item.cid || '');
+          const cidShort = cid.substring(0, 16);
+          const timeEscaped = escapeHtml(time);
+          const cidAttr = escapeHtmlAttribute(item.cid || '');
+          
+          // Only render link if URL is safe
+          let actionButtons = `<button class="btn btn-secondary btn-sm copy-btn" data-copy="${cidAttr}">Copy CID</button>`;
+          if (item.url && isSafeUrl(item.url)) {
+            const urlAttr = escapeHtmlAttribute(item.url);
+            actionButtons += ` <a href="${urlAttr}" target="_blank" rel="noopener noreferrer" class="btn btn-primary btn-sm">Open</a>`;
+          }
+          
           html += `<tr>
-            <td>${item.name || 'Unknown'}</td>
-            <td><code>${item.cid.substring(0, 16)}...</code></td>
-            <td>${time}</td>
-            <td>
-              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${item.cid}">Copy CID</button>
-              <a href="${item.url}" target="_blank" class="btn btn-primary btn-sm">Open</a>
-            </td>
+            <td>${name}</td>
+            <td><code>${cidShort}...</code></td>
+            <td>${timeEscaped}</td>
+            <td>${actionButtons}</td>
           </tr>`;
         });
         html += '</tbody></table>';
@@ -861,11 +919,16 @@ async function loadArchiveData() {
       if (data.ens && data.ens.length > 0) {
         let html = '<table class="archive-table"><thead><tr><th>Name</th><th>Content Hash</th><th>Action</th></tr></thead><tbody>';
         data.ens.forEach(([name, hash]) => {
+          const nameEscaped = escapeHtml(name || '');
+          const hashEscaped = escapeHtml(hash || '');
+          const hashShort = hashEscaped.substring(0, 20);
+          const hashAttr = escapeHtmlAttribute(hash || '');
+          
           html += `<tr>
-            <td>${name}</td>
-            <td><code>${hash.substring(0, 20)}...</code></td>
+            <td>${nameEscaped}</td>
+            <td><code>${hashShort}...</code></td>
             <td>
-              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${hash}">Copy Hash</button>
+              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${hashAttr}">Copy Hash</button>
             </td>
           </tr>`;
         });
@@ -890,9 +953,10 @@ async function loadArchiveData() {
 
   } catch (err) {
     console.error('Failed to load archive data:', err);
-    document.getElementById('hyper-archive-list').innerHTML = `<p class="error">Error: ${err.message}</p>`;
-    document.getElementById('ipfs-archive-list').innerHTML = `<p class="error">Error: ${err.message}</p>`;
-    document.getElementById('ens-archive-list').innerHTML = `<p class="error">Error: ${err.message}</p>`;
+    const errorMsg = escapeHtml(err.message || 'Unknown error');
+    document.getElementById('hyper-archive-list').innerHTML = `<p class="error">Error: ${errorMsg}</p>`;
+    document.getElementById('ipfs-archive-list').innerHTML = `<p class="error">Error: ${errorMsg}</p>`;
+    document.getElementById('ens-archive-list').innerHTML = `<p class="error">Error: ${errorMsg}</p>`;
   }
 }
 
