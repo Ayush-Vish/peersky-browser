@@ -799,6 +799,16 @@ function applyThemeImmediately(themeName) {
   }
 }
 
+function escapeHtml(text) {
+  if (!text) return text;
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 async function loadArchiveData() {
   if (!settingsAPI?.settings?.getArchiveData) return;
 
@@ -811,15 +821,21 @@ async function loadArchiveData() {
     if (hyperList) {
       if (data.hyper && data.hyper.length > 0) {
         let html = '<table class="archive-table"><thead><tr><th>Name</th><th>Key</th><th>Type</th><th>Time</th><th>Action</th></tr></thead><tbody>';
-        data.hyper.reverse().forEach(item => {
+        // Use spread to avoid mutating the original array
+        [...data.hyper].reverse().forEach(item => {
           const time = new Date(item.timestamp).toLocaleString();
+          const safeName = escapeHtml(item.name || 'Unknown');
+          const safeKey = escapeHtml(item.key);
+          const safeType = escapeHtml(item.type || 'drive');
+          const safeTime = escapeHtml(time);
+
           html += `<tr>
-            <td>${item.name || 'Unknown'}</td>
-            <td><code>${item.key.substring(0, 16)}...</code></td>
-            <td>${item.type || 'drive'}</td>
-            <td>${time}</td>
+            <td>${safeName}</td>
+            <td><code>${safeKey.substring(0, 16)}...</code></td>
+            <td>${safeType}</td>
+            <td>${safeTime}</td>
             <td>
-              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${item.key}">Copy Key</button>
+              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${safeKey}">Copy Key</button>
             </td>
           </tr>`;
         });
@@ -835,15 +851,21 @@ async function loadArchiveData() {
     if (ipfsList) {
       if (data.ipfs && data.ipfs.length > 0) {
         let html = '<table class="archive-table"><thead><tr><th>Name</th><th>CID</th><th>Time</th><th>Action</th></tr></thead><tbody>';
-        data.ipfs.reverse().forEach(item => {
+        // Use spread to avoid mutating the original array
+        [...data.ipfs].reverse().forEach(item => {
           const time = new Date(item.timestamp).toLocaleString();
+          const safeName = escapeHtml(item.name || 'Unknown');
+          const safeCid = escapeHtml(item.cid);
+          const safeUrl = escapeHtml(item.url);
+          const safeTime = escapeHtml(time);
+
           html += `<tr>
-            <td>${item.name || 'Unknown'}</td>
-            <td><code>${item.cid.substring(0, 16)}...</code></td>
-            <td>${time}</td>
+            <td>${safeName}</td>
+            <td><code>${safeCid.substring(0, 16)}...</code></td>
+            <td>${safeTime}</td>
             <td>
-              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${item.cid}">Copy CID</button>
-              <a href="${item.url}" target="_blank" class="btn btn-primary btn-sm">Open</a>
+              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${safeCid}">Copy CID</button>
+              <a href="${safeUrl}" target="_blank" class="btn btn-primary btn-sm">Open</a>
             </td>
           </tr>`;
         });
@@ -861,11 +883,14 @@ async function loadArchiveData() {
       if (data.ens && data.ens.length > 0) {
         let html = '<table class="archive-table"><thead><tr><th>Name</th><th>Content Hash</th><th>Action</th></tr></thead><tbody>';
         data.ens.forEach(([name, hash]) => {
+          const safeName = escapeHtml(name);
+          const safeHash = escapeHtml(hash);
+
           html += `<tr>
-            <td>${name}</td>
-            <td><code>${hash.substring(0, 20)}...</code></td>
+            <td>${safeName}</td>
+            <td><code>${safeHash.substring(0, 20)}...</code></td>
             <td>
-              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${hash}">Copy Hash</button>
+              <button class="btn btn-secondary btn-sm copy-btn" data-copy="${safeHash}">Copy Hash</button>
             </td>
           </tr>`;
         });
@@ -880,19 +905,31 @@ async function loadArchiveData() {
     document.querySelectorAll('.copy-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const text = btn.dataset.copy;
-        navigator.clipboard.writeText(text).then(() => {
-          const originalText = btn.textContent;
-          btn.textContent = 'Copied!';
-          setTimeout(() => btn.textContent = originalText, 2000);
-        });
+        navigator.clipboard.writeText(text)
+          .then(() => {
+            const originalText = btn.textContent;
+            btn.textContent = 'Copied!';
+            setTimeout(() => btn.textContent = originalText, 2000);
+          })
+          .catch(err => {
+            console.error('Failed to copy to clipboard:', err);
+            const originalText = btn.textContent;
+            btn.textContent = 'Failed';
+            setTimeout(() => btn.textContent = originalText, 2000);
+          });
       });
     });
 
   } catch (err) {
     console.error('Failed to load archive data:', err);
-    document.getElementById('hyper-archive-list').innerHTML = `<p class="error">Error: ${err.message}</p>`;
-    document.getElementById('ipfs-archive-list').innerHTML = `<p class="error">Error: ${err.message}</p>`;
-    document.getElementById('ens-archive-list').innerHTML = `<p class="error">Error: ${err.message}</p>`;
+    const hyperList = document.getElementById('hyper-archive-list');
+    if (hyperList) hyperList.innerHTML = `<p class="error">Error: ${escapeHtml(err.message)}</p>`;
+
+    const ipfsList = document.getElementById('ipfs-archive-list');
+    if (ipfsList) ipfsList.innerHTML = `<p class="error">Error: ${escapeHtml(err.message)}</p>`;
+
+    const ensList = document.getElementById('ens-archive-list');
+    if (ensList) ensList.innerHTML = `<p class="error">Error: ${escapeHtml(err.message)}</p>`;
   }
 }
 

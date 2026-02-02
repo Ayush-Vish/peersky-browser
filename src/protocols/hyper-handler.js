@@ -159,9 +159,12 @@ export async function createHandler(options, session) {
             // Re-create the stream for the original response
             response.data = Readable.from([buffer]);
 
-            // Log to Hyper cache
+            // Log to Hyper cache only if it looks like a key (e.g. hex string)
             const timestamp = Date.now();
-            if (!hyperCache.some(entry => entry.key === driveKey)) {
+            // Basic validation: Hypercore keys are typically 64 hex chars
+            const isHexKey = /^[0-9a-fA-F]{64}$/.test(driveKey);
+
+            if (isHexKey && !hyperCache.some(entry => entry.key === driveKey)) {
               hyperCache.push({
                 name: keyName,
                 key: driveKey,
@@ -175,7 +178,12 @@ export async function createHandler(options, session) {
         } catch (e) {
           console.error("Error logging Hyperdrive key:", e);
         }
-        originalCallback(response);
+
+        try {
+          originalCallback(response);
+        } catch (err) {
+          console.error("Error in original Hyper request callback:", err);
+        }
       };
     }
 

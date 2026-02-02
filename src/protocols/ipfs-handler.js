@@ -12,7 +12,7 @@ import { base32 } from "multiformats/bases/base32";
 import { base36 } from "multiformats/bases/base36";
 import { base58btc } from "multiformats/bases/base58";
 import { peerIdFromString, peerIdFromCID } from "@libp2p/peer-id";
-import { ensCache, saveEnsCache, ipfsCache, saveIpfsCache, RPC_URL, ipfsOptions } from "./config.js";
+import { ensCache, saveEnsCache, ipfsCache, saveIpfsCache, RPC_URL } from "./config.js";
 import { JsonRpcProvider } from "ethers";
 
 // Create a combined multibase decoder to handle base32, base36, and base58btc
@@ -74,6 +74,7 @@ export async function createHandler(ipfsOptions, session) {
       const startTime = Date.now();
       const entries = [];
       let currentFileName = null;
+      const uploadedFileNames = [];
       
       for (const data of request.uploadData || []) {
         console.log("Upload data entry:", JSON.stringify(Object.keys(data)), "type:", data.type);
@@ -89,10 +90,12 @@ export async function createHandler(ipfsOptions, session) {
                 path: entry.path,
                 content: entry.content, // Readable stream for file content
               });
+              // Note: filenames in directories are part of the path, we might not want to list them all as top-level uploads
             }
           } else {
             // Handle individual file
             const fileName = path.basename(filePath);
+            uploadedFileNames.push(fileName);
             entries.push({
               path: fileName,
               content: fs.createReadStream(filePath, { highWaterMark: 1024 * 1024 }),
@@ -114,6 +117,7 @@ export async function createHandler(ipfsOptions, session) {
           // Handle blob data from FormData - use the filename from previous rawData entry
           const blobData = await session.getBlobData(data.blobUUID);
           const fileName = currentFileName || "index.html";
+          uploadedFileNames.push(fileName);
           console.log("Processing blob with filename:", fileName, "blobUUID:", data.blobUUID);
           entries.push({ path: fileName, content: blobData });
           currentFileName = null; // Reset for next file
@@ -167,13 +171,23 @@ export async function createHandler(ipfsOptions, session) {
       try {
         const timestamp = Date.now();
         const cidStr = rootCid.toString();
+        // Use the first file name or a summary if multiple files
+        let uploadName;
+        if (uploadedFileNames.length === 1) {
+          uploadName = uploadedFileNames[0];
+        } else if (uploadedFileNames.length > 1) {
+          uploadName = `${uploadedFileNames[0]} + ${uploadedFileNames.length - 1} files`;
+        } else {
+          uploadName = "Upload " + new Date(timestamp).toLocaleString();
+        }
+
         // Check if already exists to avoid duplicates (optional but good)
         if (!ipfsCache.some(entry => entry.cid === cidStr)) {
           ipfsCache.push({
             cid: cidStr,
             timestamp: timestamp,
             url: fileUrl,
-            name: currentFileName || "Upload " + new Date(timestamp).toLocaleString()
+            name: uploadName
           });
           saveIpfsCache();
           console.log(`Logged upload to IPFS cache: ${cidStr}`);
