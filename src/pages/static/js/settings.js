@@ -809,6 +809,21 @@ function escapeHtml(text) {
     .replace(/'/g, "&#039;");
 }
 
+function sanitizeUrl(url) {
+  if (!url) return '#';
+  // Validate URL to prevent javascript: and data: URLs
+  try {
+    const parsed = new URL(url);
+    // Only allow http, https, ipfs, and hyper protocols
+    if (['http:', 'https:', 'ipfs:', 'hyper:'].includes(parsed.protocol)) {
+      return escapeHtml(url);
+    }
+  } catch (e) {
+    // Invalid URL
+  }
+  return '#';
+}
+
 async function loadArchiveData() {
   if (!settingsAPI?.settings?.getArchiveData) return;
 
@@ -856,7 +871,7 @@ async function loadArchiveData() {
           const time = new Date(item.timestamp).toLocaleString();
           const safeName = escapeHtml(item.name || 'Unknown');
           const safeCid = escapeHtml(item.cid);
-          const safeUrl = escapeHtml(item.url);
+          const safeUrl = sanitizeUrl(item.url);
           const safeTime = escapeHtml(time);
 
           html += `<tr>
