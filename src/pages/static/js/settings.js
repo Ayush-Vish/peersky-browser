@@ -829,9 +829,12 @@ function escapeHtmlAttribute(text) {
  */
 function isSafeUrl(url) {
   if (!url) return false;
+  
+  // Reject URLs starting with '//' (protocol-relative URLs)
+  if (url.trim().startsWith('//')) return false;
+  
   try {
-    // Use a base URL to prevent relative URL bypasses like '//evil.com'
-    const parsed = new URL(url, 'https://example.com/');
+    const parsed = new URL(url);
     // Only allow http, https, and p2p protocols (ipfs, ipns, hyper)
     const allowedSchemes = ['http:', 'https:', 'ipfs:', 'ipns:', 'hyper:'];
     return allowedSchemes.includes(parsed.protocol);
