@@ -831,9 +831,9 @@ function isSafeUrl(url) {
   if (!url) return false;
   try {
     const parsed = new URL(url);
-    // Block potentially dangerous URL schemes
-    const dangerousSchemes = ['javascript', 'data', 'vbscript', 'file'];
-    return !dangerousSchemes.includes(parsed.protocol.replace(':', '').toLowerCase());
+    // Only allow http and https protocols
+    const allowedSchemes = ['http:', 'https:', 'ipfs:', 'ipns:', 'hyper:'];
+    return allowedSchemes.includes(parsed.protocol);
   } catch (e) {
     // Invalid URL
     return false;
