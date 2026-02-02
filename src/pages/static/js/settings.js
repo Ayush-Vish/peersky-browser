@@ -871,7 +871,8 @@ async function loadArchiveData() {
           const time = new Date(item.timestamp).toLocaleString();
           const safeName = escapeHtml(item.name || 'Unknown');
           const safeCid = escapeHtml(item.cid);
-          const safeUrl = sanitizeUrl(item.url);
+          const validatedUrl = sanitizeUrl(item.url);
+          const safeUrl = escapeHtml(validatedUrl);
           const safeTime = escapeHtml(time);
 
           html += `<tr>
