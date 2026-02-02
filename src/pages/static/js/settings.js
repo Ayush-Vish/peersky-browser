@@ -816,7 +816,7 @@ function sanitizeUrl(url) {
     const parsed = new URL(url);
     // Only allow http, https, ipfs, ipns, and hyper protocols
     if (['http:', 'https:', 'ipfs:', 'ipns:', 'hyper:'].includes(parsed.protocol)) {
-      return url;
+      return parsed.href; // Return normalized URL
     }
   } catch (e) {
     // Invalid URL
