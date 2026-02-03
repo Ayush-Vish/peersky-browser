@@ -5,7 +5,7 @@ import { createHandler as createBrowserThemeHandler } from "./protocols/theme-ha
 import { createHandler as createIPFSHandler } from "./protocols/ipfs-handler.js";
 import { createHandler as createHyperHandler } from "./protocols/hyper-handler.js";
 import { createHandler as createWeb3Handler } from "./protocols/web3-handler.js";
-import { ipfsOptions, hyperOptions } from "./protocols/config.js";
+import { ipfsOptions, hyperOptions,ensCache, ipfsCache, hyperCache  } from "./protocols/config.js";
 import { registerShortcuts } from "./actions.js";
 import WindowManager from "./window-manager.js";
 import { setWindowManager } from "./context-menu.js";
@@ -324,4 +324,13 @@ ipcMain.on('update-group-properties', (_event, groupId, properties) => {
     }
   });
 });
+
+ipcMain.handle('settings-get-archive-data', async () => {
+  return {
+    ipfs: ipfsCache,
+    hyper: hyperCache,
+    ens: Array.from(ensCache.entries())
+  };
+});
+
 export { windowManager };
