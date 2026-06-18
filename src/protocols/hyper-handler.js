@@ -7,6 +7,7 @@ import {
   initChat,
   handleChatRequest as handleChatRequestP2P,
   CHAT_STORAGE,
+  setInternetReachability,
 } from "../pages/p2p/peerchat/p2p.js";
 import { createLogger } from '../logger.js';
 import { hyperCache, saveHyperCache } from "./config.js";
@@ -16,6 +17,15 @@ const log = createLogger('protocols:hyper');
 
 // Single SDK and swarm for the app lifecycle (hyper:// browsing + chat share the same swarm).
 let sdk, fetch;
+let connectivityTimer = null;
+let connectivityProbeRunning = false;
+
+const CONNECTIVITY_PROBE_URLS = [
+  "https://www.google.com/generate_204",
+  "https://cloudflare.com/cdn-cgi/trace",
+];
+const CONNECTIVITY_PROBE_INTERVAL_MS = 15_000;
+const CONNECTIVITY_PROBE_TIMEOUT_MS = 3_000;
 
 // keep chunks smaller to avoid oversized blocks.
 const MAX_UPLOAD_CHUNK_BYTES = 4 * 1024 * 1024;
@@ -93,17 +103,87 @@ function getChunkedBody(req) {
   return Readable.from(chunkAsyncIterable(iterable, MAX_UPLOAD_CHUNK_BYTES));
 }
 
-async function initializeHyperSDK(options) {
+async function probeUrl(url, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  timer.unref?.();
+  try {
+    const response = await globalThis.fetch(url, {
+      method: "GET",
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    return response.status >= 200 && response.status < 400;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function probeInternet(urls, timeoutMs) {
+  for (const url of urls) {
+    if (await probeUrl(url, timeoutMs)) return true;
+  }
+  return false;
+}
+
+function startConnectivityMonitor(options = {}) {
+  if (connectivityTimer || options.connectivityProbe === false) return;
+
+  const urls = Array.isArray(options.connectivityProbeUrls) && options.connectivityProbeUrls.length
+    ? options.connectivityProbeUrls
+    : CONNECTIVITY_PROBE_URLS;
+  const intervalMs = Number.isFinite(options.connectivityProbeIntervalMs)
+    ? options.connectivityProbeIntervalMs
+    : CONNECTIVITY_PROBE_INTERVAL_MS;
+  const timeoutMs = Number.isFinite(options.connectivityProbeTimeoutMs)
+    ? options.connectivityProbeTimeoutMs
+    : CONNECTIVITY_PROBE_TIMEOUT_MS;
+
+  const runProbe = async () => {
+    if (connectivityProbeRunning) return;
+    connectivityProbeRunning = true;
+    try {
+      setInternetReachability(await probeInternet(urls, timeoutMs));
+    } finally {
+      connectivityProbeRunning = false;
+    }
+  };
+
+  runProbe().catch(() => setInternetReachability(false));
+  connectivityTimer = setInterval(() => {
+    runProbe().catch(() => setInternetReachability(false));
+  }, intervalMs);
+  connectivityTimer.unref?.();
+}
+
+async function initializeHyperSDK(options = {}) {
   if (sdk != null && fetch != null) return fetch;
 
   log.info("Initializing Hyper SDK...");
 
-  sdk = await createSDK(options);
+  const {
+    connectivityProbe,
+    connectivityProbeUrls,
+    connectivityProbeIntervalMs,
+    connectivityProbeTimeoutMs,
+    ...sdkOptions
+  } = options || {};
+
+  sdk = await createSDK(sdkOptions);
   fetch = makeHyperFetch({ sdk, writable: true });
 
   initChat(sdk, {
     safeStorage,
     storagePath: path.join(app.getPath("userData"), CHAT_STORAGE),
+  });
+
+  startConnectivityMonitor({
+    connectivityProbe,
+    connectivityProbeUrls,
+    connectivityProbeIntervalMs,
+    connectivityProbeTimeoutMs,
   });
 
   log.info("Hyper SDK initialized.");

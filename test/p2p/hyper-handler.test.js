@@ -22,6 +22,7 @@ describe("Hyper protocol handler", function () {
     });
 
     const initChat = sinon.spy();
+    const setInternetReachability = sinon.spy();
     const handleChatRequest = sinon.stub();
     if (chatReject) {
       handleChatRequest.rejects(new Error(chatReject));
@@ -49,17 +50,18 @@ describe("Hyper protocol handler", function () {
         initChat,
         handleChatRequest,
         CHAT_STORAGE: "test-chat-store",
+        setInternetReachability,
       },
     });
 
-    return { module, createSDK, fetchStub, hyperFetchFactory, initChat, handleChatRequest, sdk };
+    return { module, createSDK, fetchStub, hyperFetchFactory, initChat, handleChatRequest, setInternetReachability, sdk };
   }
 
   it("routes chat namespace to chat handler", async function () {
     const { module, handleChatRequest, sdk } = await loadHyperModule({
       chatResponse: new Response("chat-routed", { status: 200, headers: { "Content-Type": "text/plain" } }),
     });
-    const handler = await module.createHandler({ storage: "test-chat" });
+    const handler = await module.createHandler({ storage: "test-chat", connectivityProbe: false });
 
     const response = await handler(new Request("hyper://chat/messages", { method: "GET" }));
 
@@ -72,7 +74,7 @@ describe("Hyper protocol handler", function () {
   it("returns 500 response when Hyper fetch fails", async function () {
     const { module } = await loadHyperModule({ throwOnFetch: true });
     sinon.stub(console, "error");
-    const handler = await module.createHandler({ storage: "test-error" });
+    const handler = await module.createHandler({ storage: "test-error", connectivityProbe: false });
 
     const response = await handler(new Request("hyper://example.org/fail", { method: "GET" }));
 
@@ -84,7 +86,7 @@ describe("Hyper protocol handler", function () {
   it("returns 500 response when chat handler rejects", async function () {
     const { module } = await loadHyperModule({ chatReject: "chat-crash" });
     sinon.stub(console, "error");
-    const handler = await module.createHandler({ storage: "test-chat-error" });
+    const handler = await module.createHandler({ storage: "test-chat-error", connectivityProbe: false });
 
     const response = await handler(new Request("hyper://chat/messages", { method: "GET" }));
 
@@ -96,7 +98,7 @@ describe("Hyper protocol handler", function () {
   it("blocks extension-origin writes when no explicit write permission is granted", async function () {
     const { module, fetchStub } = await loadHyperModule();
     const handler = await module.createHandler(
-      { storage: "test-write-deny" },
+      { storage: "test-write-deny", connectivityProbe: false },
       { isExtensionWriteAllowed: () => false },
     );
 
@@ -118,7 +120,7 @@ describe("Hyper protocol handler", function () {
     const { module, fetchStub } = await loadHyperModule();
     const permissionCheck = sinon.stub().resolves(true);
     const handler = await module.createHandler(
-      { storage: "test-write-allow" },
+      { storage: "test-write-allow", connectivityProbe: false },
       { isExtensionWriteAllowed: permissionCheck },
     );
 
